@@ -65,3 +65,6 @@ def predict_heart_disease(input_parameters: HeartDiseaseInput):
     return {
         "prediction": "The person has heart disease." if prediction[0] == 1 else "The person does not have heart disease."
     }
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the Health Oracle API!"}
