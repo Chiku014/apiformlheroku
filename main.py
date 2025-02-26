@@ -1,9 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pickle
-import json
 
+# Initialize FastAPI app
 app = FastAPI()
 
 # CORS settings to allow frontend to access the API
@@ -17,7 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Define the input data model
+# Define the input data model using Pydantic
 class HeartDiseaseInput(BaseModel):
     age: int
     sex: int
@@ -33,15 +33,24 @@ class HeartDiseaseInput(BaseModel):
     ca: int
     thal: int
 
-# Load the saved logistic regression model
-with open('LogisticRegression.sav', 'rb') as model_file:
-    heart_disease_model = pickle.load(model_file)
+# Load the saved logistic regression model with error handling
+try:
+    with open('LogisticRegression.sav', 'rb') as model_file:
+        heart_disease_model = pickle.load(model_file)
+except FileNotFoundError:
+    raise RuntimeError("🚫 Model file 'LogisticRegression.sav' not found. Please ensure it's in the correct directory.")
+except Exception as e:
+    raise RuntimeError(f"🚫 Error loading model: {e}")
 
-@app.post('/heart_disease_prediction')
+@app.get("/")
+def read_root():
+    return {"message": "🚀 Welcome to the Health Oracle API!"}
+
+@app.post("/heart_disease_prediction")
 def predict_heart_disease(input_parameters: HeartDiseaseInput):
     input_data = input_parameters.dict()
-    
-    # Extract features from the input data
+
+    # Extract features in the correct order
     features = [
         input_data['age'],
         input_data['sex'],
@@ -58,13 +67,9 @@ def predict_heart_disease(input_parameters: HeartDiseaseInput):
         input_data['thal']
     ]
 
-    # Make prediction
-    prediction = heart_disease_model.predict([features])
-
-    # Return prediction result
-    return {
-        "prediction": "The person has heart disease." if prediction[0] == 1 else "The person does not have heart disease."
-    }
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Health Oracle API!"}
+    try:
+        prediction = heart_disease_model.predict([features])
+        result = "The person has heart disease." if prediction[0] == 1 else "The person does not have heart disease."
+        return {"prediction": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {e}")
